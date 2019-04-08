@@ -1,6 +1,6 @@
 #! /usr/lib/python3.6
 # ms_rewards.py - Searches for results via pc bing browser and mobile, completes quizzes on pc bing browser
-# Version 2019.03.01
+# Version 2019.04.02
 
 # TODO replace sleeps with minimum sleeps for explicit waits to work, especially after a page redirect
 # FIXME mobile version does not require re-sign in, but pc version does, why?
@@ -37,18 +37,20 @@ POINT_TOTAL_URL = 'http://www.bing.com/rewardsapp/bepflyoutpage?style=chromeexte
 # user agents for edge/pc and mobile
 PC_USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                  'AppleWebKit/537.36 (KHTML, like Gecko) '
-                 'Chrome/64.0.3282.140 Safari/537.36 Edge/17.17134')
-MOBILE_USER_AGENT = ('Mozilla/5.0 (Windows Phone 10.0; Android 4.2.1; WebView/3.0) '
-                     'AppleWebKit/537.36 (KHTML, like Gecko) coc_coc_browser/64.118.222 '
-                     'Chrome/52.0.2743.116 Mobile Safari/537.36 Edge/15.15063')
+                 'Chrome/58.0.3029.110 Safari/537.36 Edge/16.17025')
+MOBILE_USER_AGENT = ('Mozilla/5.0 (Linux; Android 6.0.1; SM-G900I Build/MMB29M) '
+                     'AppleWebKit/537.36 (KHTML, like Gecko) '
+                     'Chrome/58.0.3029.145 Mobile Safari/537.36 EdgA/41.0.0.1270')   
+FILE_LOGIN = 'ms_rewards_login_dict.json'
 # log levels
 _LOG_LEVEL_STRINGS = ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG']
+
 
 def _log_level_string_to_int(log_level_string):
     log_level_string = log_level_string.upper()
 
-    if not log_level_string in _LOG_LEVEL_STRINGS:
-        message = 'invalid choice: {0} (choose from {1})'.format(log_level_string, _LOG_LEVEL_STRINGS)
+    if log_level_string not in _LOG_LEVEL_STRINGS:
+        message = f'invalid choice: {log_level_string} (choose from {_LOG_LEVEL_STRINGS})'
         raise argparse.ArgumentTypeError(message)
 
     log_level_int = getattr(logging, log_level_string, logging.INFO)
@@ -108,7 +110,14 @@ def parse_args():
         default='INFO',
         dest='log_level',
         type=_log_level_string_to_int,
-        help='Set the logging output level. {0}'.format(_LOG_LEVEL_STRINGS))
+        help=f'Set the logging output level. {_LOG_LEVEL_STRINGS}')
+    arg_parser.add_argument(
+        '--f',    
+        action='store',
+        default=FILE_LOGIN,
+        dest='file',
+        type=str,
+        help=f'Set the file with login and password')
     return arg_parser.parse_args()
 
 
@@ -152,12 +161,12 @@ def get_search_terms():
     return list(set(search_terms))
 
 
-def get_login_info():
+def get_login_info(login_file):
     """
     Gets login usernames and passwords from json
     :return: login dict
     """
-    with open('ms_rewards_login_dict.json', 'r') as f:
+    with open(login_file, 'r') as f:
         return json.load(f)
 
 
@@ -216,6 +225,7 @@ def browser_setup(headless_mode, user_agent):
     options.add_argument(f'user-agent={user_agent}')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    options.add_argument("--lang=en");
 
     chrome_obj = webdriver.Chrome(path, chrome_options=options)
 
@@ -238,11 +248,11 @@ def log_in(email_address, pass_word):
     send_key_by_name('passwd', pass_word)
     logging.debug(msg='Sent Password.')
     # wait for 'sign in' button to be clickable and sign in
-    time.sleep(0.1)
+    time.sleep(0.5)
     send_key_by_name('passwd', Keys.RETURN)
-    time.sleep(1)
+    time.sleep(0.5)
     wait_until_visible(By.ID, 'uhfLogo', 10)
-    time.sleep(2)
+    time.sleep(0.5)
 
 
 def find_by_id(obj_id):
@@ -281,31 +291,48 @@ def find_by_css(selector):
     return browser.find_elements_by_css_selector(selector)
 
 
+# def wait_until_visible(by_, selector, time_to_wait=10):
+#     """
+#     Wait until all objects matching selector are visible
+#     :param by_: Select by ID, XPATH, CSS Selector, other, from By module
+#     :param selector: string of selector
+#     :param time_to_wait: Int time to wait
+#     :return: None
+#     """
+#     try:
+#         WebDriverWait(browser, time_to_wait).until(ec.visibility_of_element_located((by_, selector)))
+#     except TimeoutException:
+#         logging.exception(msg=f'{selector} element Not Visible - Timeout Exception', exc_info=False)
+#         screenshot(selector)
+#         browser.refresh()
+#     except UnexpectedAlertPresentException:
+#         # FIXME
+#         browser.switch_to.alert.dismiss()
+#         # logging.exception(msg=f'{selector} element Not Visible - Unexpected Alert Exception', exc_info=False)
+#         # screenshot(selector)
+#         # browser.refresh()
+#     except WebDriverException:
+#         logging.exception(msg=f'Webdriver Error for {selector} object')
+#         screenshot(selector)
+#         browser.refresh()
+
+
 def wait_until_visible(by_, selector, time_to_wait=10):
     """
-    Wait until all objects matching selector are visible
-    :param by_: Select by ID, XPATH, CSS Selector, other, from By module
-    :param selector: string of selector
-    :param time_to_wait: Int time to wait
-    :return: None
+    Searches for selector and if found, end the loop
+    Else, keep repeating every 2 seconds until time elapsed, then refresh page
+    :param by_: string which tag to search by
+    :param selector: string selector
+    :param time_to_wait: int time to wait
+    :return: Boolean if selector is found
     """
-    try:
-        WebDriverWait(browser, time_to_wait).until(ec.visibility_of_element_located((by_, selector)))
-    except TimeoutException:
-        logging.exception(msg=f'{selector} element Not Visible - Timeout Exception', exc_info=False)
-        screenshot(selector)
-        browser.refresh()
-    except UnexpectedAlertPresentException:
-        # FIXME
-        browser.switch_to.alert.dismiss()
-        # logging.exception(msg=f'{selector} element Not Visible - Unexpected Alert Exception', exc_info=False)
-        # screenshot(selector)
-        # browser.refresh()
-    except WebDriverException:
-        logging.exception(msg=f'Webdriver Error for {selector} object')
-        screenshot(selector)
-        browser.refresh()
-
+    start_time = time.time()
+    while (time.time() - start_time) < time_to_wait:
+        if browser.find_element(by=by_, value=selector):
+            return True
+        time.sleep(2)
+    browser.refresh()
+    return False
 
 def wait_until_clickable(by_, selector, time_to_wait=10):
     """
@@ -481,7 +508,7 @@ def search(search_terms, mobile_search=False):
             try:
                 # clears search bar and enters in next search term
                 time.sleep(1)
-                wait_until_visible(By.ID, 'sb_form_q', 30)
+                wait_until_visible(By.ID, 'sb_form_q', 15)
                 clear_by_id('sb_form_q')
                 send_key_by_id('sb_form_q', item)
                 time.sleep(0.1)
@@ -563,7 +590,7 @@ def iter_dailies():
         # check at the end of the loop to log if any offers are remaining
         browser.get(DASHBOARD_URL)
         time.sleep(0.1)
-        wait_until_visible(By.TAG_NAME, 'body', 10)
+        wait_until_visible(By.TAG_NAME, 'body', 10)  # checks for page load
         open_offers = browser.find_elements_by_xpath('//span[contains(@class, "mee-icon-AddMedium")]')
         logging.info(msg=f'Number of incomplete offers remaining: {len(open_offers)}')
     else:
@@ -704,9 +731,16 @@ def get_point_total(pc=False, mobile=False, log=False):
     """
     browser.get(POINT_TOTAL_URL)
     # get number of total number of points
-    wait_until_visible(By.XPATH, '//*[@id="flyoutContent"]', 10)
-    pcsearch = browser.find_element_by_class_name('pcsearch')
-    pcsearch.location_once_scrolled_into_view
+    # wait_until_visible(By.XPATH, '//*[@id="flyoutContent"]', 10)  # check for loaded point display
+
+    # TODO add a scroll to obj here
+    if not wait_until_visible(By.CLASS_NAME, 'pcsearch', 10):  # if object not found, return False
+        return False
+    # returns None if pc search not found
+    # pcsearch = browser.find_element_by_class_name('pcsearch')
+    # if pcsearch.location_once_scrolled_into_view is None:  # property causes pc search to be scrolled into area
+    #     return False
+
     try:
         current_point_total = list(map(
             int, browser.find_element_by_class_name('credits2').text.split(' of ')))[0]
@@ -717,8 +751,9 @@ def get_point_total(pc=False, mobile=False, log=False):
         current_mobile_points, max_mobile_points = map(
             int, browser.find_element_by_class_name('mobilesearch').text.split('/'))
         # get edge points
-        current_edge_points, max_edge_points = map(
-            int, browser.find_element_by_class_name('edgesearch').text.split('/'))
+        # disabled because not detected in new point url
+        # current_edge_points, max_edge_points = map(
+        #     int, browser.find_element_by_class_name('edgesearch').text.split('/'))
     except ValueError:
         return False
 
@@ -726,12 +761,13 @@ def get_point_total(pc=False, mobile=False, log=False):
     if log:
         logging.info(msg=f'Total points = {current_point_total}')
         logging.info(msg=f'PC points = {current_pc_points}/{max_pc_points}')
-        logging.info(msg=f'Edge points = {current_edge_points}/{max_edge_points}')
+        # logging.info(msg=f'Edge points = {current_edge_points}/{max_edge_points}')
         logging.info(msg=f'Mobile points = {current_mobile_points}/{max_mobile_points}')
 
     # if pc flag, check if pc and edge points met
     if pc:
-        if current_pc_points < max_pc_points or current_edge_points < max_edge_points:
+        # if current_pc_points < max_pc_points or current_edge_points < max_edge_points:
+        if current_pc_points < max_pc_points:
             return False
         return True
     # if mobile flag, check if mobile points met
@@ -791,9 +827,26 @@ if __name__ == '__main__':
         logging.info(msg='--------------------------------------------------')
 
         # get login dict
-        login_dict = get_login_info()
+        login_dict = get_login_info(parser.file) 
+        login_dict_keys = list(login_dict.keys())   
         logging.info(msg='logins retrieved.')
 
+        # get PC_USER_AGENT dict  
+        exists = os.path.isfile('pc_'+parser.file)
+        if exists:
+            pc_dict = get_login_info('pc_'+parser.file)
+            logging.info(msg='PC_USER_AGENTS retrieved.')
+        else:
+            pc_dict = dict.fromkeys(login_dict_keys, PC_USER_AGENT)
+         
+        # get MOBILE_USER_AGENT dict 
+        exists = os.path.isfile('mob_'+parser.file)
+        if exists:
+            mob_dict = get_login_info('mob_'+parser.file)
+            logging.info(msg='MOBILE_USER_AGENTS retrieved.') 
+        else:
+            mob_dict = dict.fromkeys(login_dict_keys, MOBILE_USER_AGENT)
+        
         # get search terms
         search_list = []
         if parser.mobile_mode or parser.pc_mode:
@@ -805,7 +858,6 @@ if __name__ == '__main__':
             email_links = get_email_links()
 
         # iter through accounts, search, and complete quizzes
-        login_dict_keys = list(login_dict.keys())
         random.shuffle(login_dict_keys)
         for dict_key in login_dict_keys:
             email = dict_key
@@ -815,7 +867,7 @@ if __name__ == '__main__':
                 # MOBILE MODE
                 logging.info(msg='-------------------------MOBILE-------------------------')
                 # set up headless browser and mobile user agent
-                browser = browser_setup(parser.headless_setting, MOBILE_USER_AGENT)
+                browser = browser_setup(parser.headless_setting, mob_dict[dict_key])
                 try:
                     log_in(email, password)
                     browser.get(DASHBOARD_URL)
@@ -836,7 +888,7 @@ if __name__ == '__main__':
                 # PC MODE
                 logging.info(msg='-------------------------PC-------------------------')
                 # set up edge headless browser and edge pc user agent
-                browser = browser_setup(parser.headless_setting, PC_USER_AGENT)
+                browser = browser_setup(parser.headless_setting, pc_dict[dict_key])
                 try:
                     log_in(email, password)
                     browser.get(DASHBOARD_URL)

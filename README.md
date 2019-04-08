@@ -30,15 +30,18 @@ This program will automatically complete search requests and quizzes on Microsof
 <h2>HOW TO USE</h2> 
 
 1. Clone and navigate to repo
-2. Modify ms_rewards_login_dict.json with your account names and passwords, remove .example from filename.
+2.1. Modify ms_rewards_login_dict.json with your account names and passwords, remove .example from filename.
+2.2. Modify pc_ms_rewards_login_dict.json with your account names and pc user agents, remove .example from filename.
+2.3. Modify mob_ms_rewards_login_dict.json with your account names and mobile user agents, remove .example from filename.
 3. Enter into cmd/terminal/shell: `pip install -r requirements.txt`
 	- This installs dependencies (selenium)
-4. Enter into cmd/terminal/shell: `python ms_rewards.py --headless --mobile --pc --quiz`
+4. Enter into cmd/terminal/shell: `python3 ms_rewards.py --headless --mobile --pc --quiz`
 	- enter `-h` or `--help` for more instructions
 		- `--headless` is for headless mode
 		- `--mobile` is for mobile search
 		- `--pc` is for pc search
-		- `--quiz` is for quiz search  
+		- `--quiz` is for quiz search 
+    - `--f` using diferent filename with login/password (script will use pc_<filename> and mob_<filename> files for user agents list)  
 	- Script by will execute mobile, pc, edge, searches, and complete quizzes for all accounts (can change this setting in the .py file)
 	- Script by default will run headlessly (can change this setting in the .py file)  
 	- Run time for one account is under 5 minutes, for 100% daily completion 
@@ -77,6 +80,15 @@ This program will automatically complete search requests and quizzes on Microsof
 
 
 <h2>Versions</h2>  
+
+**2019.04.02**
+
+    - Added adreo00's code for setting log level with argparse
+
+**2019.04.01**  
+
+    - Added fix for detecting pcpoints element during point status check
+    - Removed edge points as the status screen no longer displays them
 
 **2019.03.01**
 
