@@ -995,8 +995,8 @@ if __name__ == "__main__":
                     # mobile search
                     search(search_list, mobile_search=True)
                     # get point totals if running just in mobile mode
-                    if (not parser.pc_mode or not parser.quiz_mode
-                            or not parser.email_mode):
+                    if not (parser.pc_mode or parser.quiz_mode
+                            or parser.email_mode):
                         get_point_total(mobile=True, log=True)
                     browser.quit()
                 except KeyboardInterrupt:
